@@ -143,24 +143,18 @@
         row.append(cb, name, val, delBtn);
 
         if (p.name && p.name.startsWith("Familie ")) {
-          const timer = document.createElement("span");
-          timer.id = "timer_" + id;
-          timer.style.fontSize = "0.8rem";
-          timer.style.marginLeft = "1rem";
-          timer.style.color = "#9f1239";
-          timer.style.display = "block";
-          let remaining = 60;
-          timer.textContent = "";
-          setTimeout(() => {
-            timer.textContent = "Löschen in 60s";
-            const interval = setInterval(() => {
-              remaining--;
-              timer.textContent = "Löschen in " + remaining + "s";
-              if (remaining <= 0) clearInterval(interval);
-            }, 1000);
-          }, 10000);
-          row.append(timer);
+  // Nur im Hintergrund löschen, keine Anzeige
+  setTimeout(() => {
+    setTimeout(() => {
+      ref.child(id).once("value", snap => {
+        const entry = snap.val();
+        if (entry && entry.name === p.name) {
+          ref.child(id).remove();
         }
+      });
+    }, 20000); // 20 Sekunden
+  }, 10000);   // 10 Sekunden Verzögerung vor Start
+}
 
         container.appendChild(row);
       });
