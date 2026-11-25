@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Thomas Auslagenabrechnung-Abrechnung – LIVE</title>
+  <title>Auslagenabrechnung</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon.png" />
   <meta name="theme-color" content="#9f1239" />
@@ -11,6 +11,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
   <style>
     body {
       font-family: sans-serif;
@@ -18,6 +19,7 @@
       margin: 0;
       padding: 1rem;
     }
+
     .container {
       max-width: 900px;
       margin: auto;
@@ -26,6 +28,7 @@
       padding: 1rem;
       box-shadow: 0 0 15px rgba(0,0,0,0.1);
     }
+
     .row {
       display: flex;
       gap: 0.5rem;
@@ -33,19 +36,24 @@
       align-items: center;
       flex-wrap: nowrap;
     }
+
     .row input[type="text"] {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
       max-width: 250px;
       padding: 0.4rem;
     }
+
     .row input[type="number"] {
-      width: 100%;
-      max-width: 100px;
+      width: 100px;
+      min-width: 0;
       padding: 0.4rem;
     }
+
     .row input[type="checkbox"] {
       flex: 0 0 auto;
     }
+
     .button {
       margin-top: 1rem;
       padding: 0.5rem 1rem;
@@ -55,24 +63,51 @@
       border-radius: 6px;
       cursor: pointer;
     }
+
+    #error {
+      color: #9f1239;
+      font-weight: bold;
+    }
+
     @media (max-width: 600px) {
       .row {
         flex-wrap: nowrap;
         gap: 0.5rem;
       }
+
+      .row input[type="number"] {
+        width: 75px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
-    <img src="assets/header.png" alt="Header" style="width: 100%; border-radius: 1rem; margin-bottom: 1rem;" />
-    <h1>🎁 Thomas Auslagenabrechnung-Abrechnung – LIVE</h1>
+
+    <img src="assets/header.png"
+         alt="Gemeinsame Auslagenabrechnung"
+         style="width:100%; border-radius:1rem; margin-bottom:1rem;" />
+
+    <h1>Auslagenabrechnung</h1>
+
     <p>Gemeinsame Ausgaben erfassen, Kosten fair aufteilen und Zahlungen einfach ausgleichen.</p>
+
+    <div id="error" role="alert"></div>
     <div id="families"></div>
-    <button class="button" onclick="addFamily()">➕ Teilnehmer hinzufügen</button>
-    <h2 style="margin-top:2rem">💸 Ausgleichszahlungen</h2>
+
+    <button class="button" onclick="addFamily()">
+      + Teilnehmer hinzufügen
+    </button>
+
+    <h2 style="margin-top:2rem">
+      Ausgleichszahlungen
+    </h2>
+
     <ul id="payments"></ul>
+
   </div>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBnmptcPPnOXDMCPL6OE_CHOl1xCS-Xgsk",
@@ -85,23 +120,44 @@
     };
 
     firebase.initializeApp(firebaseConfig);
+
     const db = firebase.database();
     const ref = db.ref("familien");
+    const timers = new Map();
 
-    ref.on("value", snapshot => {
-      const data = snapshot.val() || {};
-      render(data);
+    const currency = new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR"
     });
 
+    function showError(error) {
+      document.getElementById("error").textContent =
+        "Datenbankfehler: " + error.message;
+    }
+
+    function clearError() {
+      document.getElementById("error").textContent = "";
+    }
+
+    function isPlaceholder(name) {
+      return /^(Teilnehmer|Familie) \d+$/.test(name || "");
+    }
+
+    ref.on("value", snapshot => {
+      clearError();
+      render(snapshot.val() || {});
+    }, showError);
+
     function render(data) {
+
       const container = document.getElementById("families");
       container.innerHTML = "";
+
       const entries = Object.entries(data);
       const active = entries.filter(([_, p]) => p.active);
-      const total = active.reduce((sum, [_, p]) => sum + p.contribution, 0);
-      const avg = active.length ? total / active.length : 0;
 
       entries.forEach(([id, p]) => {
+
         const row = document.createElement("div");
         row.className = "row";
 
@@ -113,20 +169,32 @@
         const name = document.createElement("input");
         name.type = "text";
         name.value = p.name;
+        name.placeholder = "Name";
         name.onblur = () => {
-          update(id, "name", name.value);
-          const timerEl = document.getElementById("timer_" + id);
-          if (timerEl && !name.value.startsWith("Familie ")) {
-            timerEl.remove();
+          if (name.value !== p.name) {
+            update(id, "name", name.value.trim());
           }
         };
 
         const val = document.createElement("input");
         val.type = "number";
+        val.step = "0.01";
+        val.min = "0";
         val.value = p.contribution;
-        val.onblur = () => update(id, "contribution", parseFloat(val.value) || 0);
+
+        val.onblur = () => {
+          const amount = Math.max(
+            0,
+            Math.round((parseFloat(val.value) || 0) * 100) / 100
+          );
+
+          if (amount !== p.contribution) {
+            update(id, "contribution", amount);
+          }
+        };
 
         const delBtn = document.createElement("button");
+
         delBtn.innerText = "🗑️";
         delBtn.title = "Eintrag löschen";
         delBtn.style.padding = "0.3rem 0.6rem";
@@ -134,86 +202,157 @@
         delBtn.style.border = "none";
         delBtn.style.background = "#eee";
         delBtn.style.cursor = "pointer";
+
         delBtn.onclick = () => {
-          if (confirm('Soll dieser Eintrag gelöscht werden?')) {
-            ref.child(id).remove();
+          if (confirm("Soll dieser Eintrag gelöscht werden?")) {
+            ref.child(id).remove().catch(showError);
           }
         };
 
         row.append(cb, name, val, delBtn);
+        container.appendChild(row);
 
-        if (p.name && p.name.startsWith("Familie ")) {
-  // Nur im Hintergrund löschen, keine Anzeige
-  setTimeout(() => {
-    setTimeout(() => {
-      ref.child(id).once("value", snap => {
-        const entry = snap.val();
-        if (entry && entry.name === p.name) {
-          ref.child(id).remove();
+        if (isPlaceholder(p.name) && !timers.has(id)) {
+
+          const timer = setTimeout(() => {
+
+            ref.child(id).transaction(entry => {
+              if (
+                entry &&
+                entry.name === p.name &&
+                Number(entry.contribution) === 0
+              ) {
+                return null;
+              }
+            }).catch(showError);
+
+            timers.delete(id);
+
+          }, 30000);
+
+          timers.set(id, timer);
+
+        } else if (!isPlaceholder(p.name) && timers.has(id)) {
+
+          clearTimeout(timers.get(id));
+          timers.delete(id);
+
         }
       });
-    }, 20000); // 20 Sekunden
-  }, 10000);   // 10 Sekunden Verzögerung vor Start
-}
 
-        container.appendChild(row);
-      });
+      calculatePayments(active);
+    }
+
+    function calculatePayments(active) {
 
       const list = document.getElementById("payments");
       list.innerHTML = "";
-      const payments = [];
-      const creditors = active.map(([_, p]) => ({ ...p })).filter(p => p.contribution > avg);
-      const debtors = active.map(([_, p]) => ({ ...p })).filter(p => p.contribution < avg);
 
-      for (let d of debtors) {
-        let owed = avg - d.contribution;
-        for (let c of creditors) {
-          const over = c.contribution - avg;
-          const part = Math.min(owed, over);
-          if (part > 0) {
-            payments.push(`${d.name} zahlt ${part.toFixed(2)} € an ${c.name}`);
-            owed -= part;
-            c.contribution -= part;
+      if (!active.length) {
+        list.innerHTML = "<li>Noch keine Teilnehmer vorhanden.</li>";
+        return;
+      }
+
+      const total = active.reduce(
+        (sum, [_, p]) =>
+          sum + Math.round((Number(p.contribution) || 0) * 100),
+        0
+      );
+
+      const baseShare = Math.floor(total / active.length);
+      const remainder = total % active.length;
+
+      const balances = active.map(([id, p], index) => {
+
+        const paid = Math.round(
+          (Number(p.contribution) || 0) * 100
+        );
+
+        const share = baseShare + (index < remainder ? 1 : 0);
+
+        return {
+          name: p.name,
+          balance: paid - share
+        };
+      });
+
+      const creditors = balances.filter(p => p.balance > 0);
+      const debtors = balances.filter(p => p.balance < 0);
+
+      const payments = [];
+
+      for (const debtor of debtors) {
+
+        let owed = -debtor.balance;
+
+        for (const creditor of creditors) {
+
+          const amount = Math.min(owed, creditor.balance);
+
+          if (amount > 0) {
+
+            payments.push(
+              `${debtor.name} zahlt ${currency.format(amount / 100)} an ${creditor.name}`
+            );
+
+            owed -= amount;
+            creditor.balance -= amount;
           }
-          if (owed <= 0) break;
+
+          if (owed === 0) break;
         }
       }
 
-      if (payments.length === 0) {
+      if (!payments.length) {
+
         list.innerHTML = "<li>Alle Auslagen sind ausgeglichen.</li>";
+
       } else {
-        payments.forEach(p => {
+
+        payments.forEach(payment => {
+
           const li = document.createElement("li");
-          li.innerText = p;
+          li.textContent = payment;
           list.appendChild(li);
+
         });
       }
     }
 
     function update(id, key, value) {
-      ref.child(id).update({ [key]: value });
+
+      ref.child(id)
+        .update({ [key]: value })
+        .catch(showError);
     }
 
-    function addFamily() {
-      ref.once("value", snapshot => {
-        const data = snapshot.val() || {};
-        const totalEntries = Object.keys(data).length;
-        const next = totalEntries + 1;
-        const id = Date.now().toString();
-        const newName = "Familie " + next;
-        ref.child(id).set({ name: newName, active: true, contribution: 0 });
+    async function addFamily() {
 
-        setTimeout(() => {
-          ref.child(id).once("value", snap => {
-            const entry = snap.val();
-            if (entry && entry.name === newName) {
-              ref.child(id).remove();
-              const timerEl = document.getElementById("timer_" + id);
-              if (timerEl) timerEl.remove();
-            }
-          });
-        }, 70000);
-      });
+      try {
+
+        const snapshot = await ref.once("value");
+        const data = snapshot.val() || {};
+
+        const usedNames = Object.values(data).map(p => p.name);
+
+        let next = 1;
+
+        while (
+          usedNames.includes("Teilnehmer " + next) ||
+          usedNames.includes("Familie " + next)
+        ) {
+          next++;
+        }
+
+        await ref.push({
+          name: "Teilnehmer " + next,
+          active: true,
+          contribution: 0
+        });
+
+      } catch (error) {
+        showError(error);
+      }
     }
   </script>
 </body>
