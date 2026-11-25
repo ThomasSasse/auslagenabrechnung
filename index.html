@@ -69,8 +69,8 @@
     <h1>🎁 Thomas Auslagenabrechnung-Abrechnung – LIVE</h1>
     <p>Gemeinsame Ausgaben erfassen, Kosten fair aufteilen und Zahlungen einfach ausgleichen.</p>
     <div id="families"></div>
-    <button class="button" onclick="addFamily()">➕ Familie hinzufügen</button>
-    <h2 style="margin-top:2rem">💸 Zahlungen</h2>
+    <button class="button" onclick="addFamily()">➕ Teilnehmer hinzufügen</button>
+    <h2 style="margin-top:2rem">💸 Ausgleichszahlungen</h2>
     <ul id="payments"></ul>
   </div>
   <script>
@@ -180,7 +180,7 @@
       }
 
       if (payments.length === 0) {
-        list.innerHTML = "<li>Alle Beiträge sind ausgeglichen.</li>";
+        list.innerHTML = "<li>Alle Auslagen sind ausgeglichen.</li>";
       } else {
         payments.forEach(p => {
           const li = document.createElement("li");
