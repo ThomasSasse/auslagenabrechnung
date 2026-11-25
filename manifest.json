@@ -1,6 +1,6 @@
 {
   "name": "Thomas Auslagenabrechnung",
-  "short_name": "Auslagen",
+  "short_name": "Thomas Auslagenabrechnung",
   "description": "Gemeinsame Ausgaben erfassen und Kosten fair aufteilen.",
   "start_url": "./index.html",
   "scope": "./",
